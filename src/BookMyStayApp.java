@@ -60,26 +60,45 @@ class RoomInventory {
     }
 }
 
-public class BookMyStayApp {
-    public static void main(String[] args) {
-        System.out.println("Hotel Room Inventory Status\n");
+class RoomSearchService {
+    public void searchAvailableRooms(
+            RoomInventory inventory,
+            Room singleRoom,
+            Room doubleRoom,
+            Room suiteRoom) {
 
-        RoomInventory inventory = new RoomInventory();
         Map<String, Integer> availability = inventory.getRoomAvailability();
 
+        if (availability.get("Single") > 0) {
+            System.out.println("Single Room:");
+            singleRoom.displayRoomDetails();
+            System.out.println("Available: " + availability.get("Single") + "\n");
+        }
+
+        if (availability.get("Double") > 0) {
+            System.out.println("Double Room:");
+            doubleRoom.displayRoomDetails();
+            System.out.println("Available: " + availability.get("Double") + "\n");
+        }
+
+        if (availability.get("Suite") > 0) {
+            System.out.println("Suite Room:");
+            suiteRoom.displayRoomDetails();
+            System.out.println("Available: " + availability.get("Suite"));
+        }
+    }
+}
+
+public class BookMyStayApp {
+    public static void main(String[] args) {
+        System.out.println("Room Search\n");
+
+        RoomInventory inventory = new RoomInventory();
         Room singleRoom = new SingleRoom();
-        System.out.println("Single Room:");
-        singleRoom.displayRoomDetails();
-        System.out.println("Available Rooms: " + availability.get("Single") + "\n");
-
         Room doubleRoom = new DoubleRoom();
-        System.out.println("Double Room:");
-        doubleRoom.displayRoomDetails();
-        System.out.println("Available Rooms: " + availability.get("Double") + "\n");
-
         Room suiteRoom = new SuiteRoom();
-        System.out.println("Suite Room:");
-        suiteRoom.displayRoomDetails();
-        System.out.println("Available Rooms: " + availability.get("Suite"));
+
+        RoomSearchService searchService = new RoomSearchService();
+        searchService.searchAvailableRooms(inventory, singleRoom, doubleRoom, suiteRoom);
     }
 }
