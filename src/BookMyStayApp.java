@@ -292,21 +292,87 @@ class CancellationService {
     }
 }
 
+// ---------------------------------------------------------
+// NEW FOR USE CASE 11
+// ---------------------------------------------------------
+class ConcurrentBookingProcessor implements Runnable {
+    private BookingRequestQueue bookingQueue;
+    private RoomInventory inventory;
+    private RoomAllocationService allocationService;
+
+    public ConcurrentBookingProcessor(
+            BookingRequestQueue bookingQueue,
+            RoomInventory inventory,
+            RoomAllocationService allocationService
+    ) {
+        this.bookingQueue = bookingQueue;
+        this.inventory = inventory;
+        this.allocationService = allocationService;
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            Reservation reservation = null;
+
+            // Synchronize on the booking queue to ensure that only
+            // one thread can retrieve a request at a time.
+            synchronized (bookingQueue) {
+                if (bookingQueue.hasPendingRequests()) {
+                    reservation = bookingQueue.getNextRequest();
+                } else {
+                    break;
+                }
+            }
+
+            // Allocation also mutates shared inventory.
+            // Synchronization ensures atomic allocation.
+            if (reservation != null) {
+                synchronized (inventory) {
+                    allocationService.allocateRoom(reservation, inventory);
+                }
+            }
+        }
+    }
+}
+
 public class BookMyStayApp {
     public static void main(String[] args) {
-        System.out.println("Booking Cancellation");
+        System.out.println("Concurrent Booking Simulation");
 
         RoomInventory inventory = new RoomInventory();
-        CancellationService cancelService = new CancellationService();
+        BookingRequestQueue bookingQueue = new BookingRequestQueue();
+        RoomAllocationService allocationService = new RoomAllocationService();
 
-        // Simulating that "Single-1" was already booked by storing it in the map
-        cancelService.registerBooking("Single-1", "Single");
+        // Add reservations specifically to match the output from the UC11 prompt
+        bookingQueue.addRequest(new Reservation("Abhi", "Single"));
+        bookingQueue.addRequest(new Reservation("Vanmathi", "Double"));
+        bookingQueue.addRequest(new Reservation("Kural", "Suite"));
+        bookingQueue.addRequest(new Reservation("Subha", "Single"));
 
-        // Cancel the booking and trigger the stack rollback
-        cancelService.cancelBooking("Single-1", inventory);
-        cancelService.showRollbackHistory();
+        // Create booking processor tasks
+        Thread t1 = new Thread(
+                new ConcurrentBookingProcessor(bookingQueue, inventory, allocationService)
+        );
 
-        // Print the updated availability (Initial 5 + 1 returned = 6)
-        System.out.println("\nUpdated Single Room Availability: " + inventory.getRoomAvailability().get("Single"));
+        Thread t2 = new Thread(
+                new ConcurrentBookingProcessor(bookingQueue, inventory, allocationService)
+        );
+
+        // Start concurrent processing
+        t1.start();
+        t2.start();
+
+        try {
+            t1.join();
+            t2.join();
+        } catch (InterruptedException e) {
+            System.out.println("Thread execution interrupted.");
+        }
+
+        System.out.println("\nRemaining Inventory:");
+        System.out.println("Single: " + inventory.getRoomAvailability().get("Single"));
+        System.out.println("Double: " + inventory.getRoomAvailability().get("Double"));
+        System.out.println("Suite: " + inventory.getRoomAvailability().get("Suite"));
     }
 }
