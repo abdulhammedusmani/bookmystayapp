@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.Stack;
 
 abstract class Room {
     protected int numberOfBeds;
@@ -236,9 +237,6 @@ class BookingReportService {
     }
 }
 
-// ---------------------------------------------------------
-// NEW FOR USE CASE 9
-// ---------------------------------------------------------
 class InvalidBookingException extends Exception {
     public InvalidBookingException(String message) {
         super(message);
@@ -250,43 +248,65 @@ class ReservationValidator {
         if (guestName == null || guestName.trim().isEmpty()) {
             throw new InvalidBookingException("Guest name cannot be empty.");
         }
-
-        // Check if the provided room type matches the actual inventory keys exactly (case-sensitive)
         if (!inventory.getRoomAvailability().containsKey(roomType)) {
             throw new InvalidBookingException("Invalid room type selected.");
         }
     }
 }
 
+class CancellationService {
+    private Stack<String> releasedRoomIds;
+    private Map<String, String> reservationRoomTypeMap;
+
+    public CancellationService() {
+        releasedRoomIds = new Stack<>();
+        reservationRoomTypeMap = new HashMap<>();
+    }
+
+    public void registerBooking(String reservationId, String roomType) {
+        reservationRoomTypeMap.put(reservationId, roomType);
+    }
+
+    public void cancelBooking(String reservationId, RoomInventory inventory) {
+        if (reservationRoomTypeMap.containsKey(reservationId)) {
+            String roomType = reservationRoomTypeMap.get(reservationId);
+            releasedRoomIds.push(reservationId);
+            reservationRoomTypeMap.remove(reservationId);
+
+            Map<String, Integer> avail = inventory.getRoomAvailability();
+            inventory.updateAvailability(roomType, avail.get(roomType) + 1);
+
+            System.out.println("Booking cancelled successfully. Inventory restored for room type: " + roomType);
+        } else {
+            System.out.println("Cancellation failed: Reservation ID not found.");
+        }
+    }
+
+    public void showRollbackHistory() {
+        System.out.println("\nRollback History (Most Recent First):");
+        @SuppressWarnings("unchecked")
+        Stack<String> tempStack = (Stack<String>) releasedRoomIds.clone();
+        while (!tempStack.isEmpty()) {
+            System.out.println("Released Reservation ID: " + tempStack.pop());
+        }
+    }
+}
+
 public class BookMyStayApp {
     public static void main(String[] args) {
-        System.out.println("Booking Validation");
+        System.out.println("Booking Cancellation");
 
-        Scanner scanner = new Scanner(System.in);
-
-        // Initialize required components
         RoomInventory inventory = new RoomInventory();
-        ReservationValidator validator = new ReservationValidator();
-        BookingRequestQueue bookingQueue = new BookingRequestQueue(); // Required by instructions snippet, even if unused
+        CancellationService cancelService = new CancellationService();
 
-        System.out.print("Enter guest name: ");
-        String guestName = scanner.nextLine();
+        // Simulating that "Single-1" was already booked by storing it in the map
+        cancelService.registerBooking("Single-1", "Single");
 
-        System.out.print("Enter room type (Single/Double/Suite): ");
-        String roomType = scanner.nextLine();
+        // Cancel the booking and trigger the stack rollback
+        cancelService.cancelBooking("Single-1", inventory);
+        cancelService.showRollbackHistory();
 
-        try {
-            // Validate booking input provided by the user
-            validator.validate(guestName, roomType, inventory);
-
-            // If validation passes, we would theoretically process the booking here.
-            System.out.println("Booking validation passed!");
-
-        } catch (InvalidBookingException e) {
-            // Handle domain-specific validation errors
-            System.out.println("Booking failed: " + e.getMessage());
-        } finally {
-            scanner.close();
-        }
+        // Print the updated availability (Initial 5 + 1 returned = 6)
+        System.out.println("\nUpdated Single Room Availability: " + inventory.getRoomAvailability().get("Single"));
     }
 }
